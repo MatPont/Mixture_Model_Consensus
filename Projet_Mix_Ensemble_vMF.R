@@ -54,11 +54,17 @@ run <- function(data, label, verbose=FALSE){
   cat("=======\n# movMF\n=======\n")
   res_models <- c()
   methods <- c("Banerjee_et_al_2005","Tanabe_et_al_2007","Sra_2012","Song_et_al_2012","uniroot","Newton","Halley","hybrid","Newton_Fourier")
+  best_loglike <- NULL
+  best_partition <- NULL
   for(method in methods){
     print(method)
-    temp <- movMF(data, no_cluster, verbose=verbose, method=method, nruns=10)   
+    temp <- movMF(data, no_cluster, verbose=verbose, nruns=10, control = list(kappa = method))   
     res <- apply(temp$P, MARGIN=1, FUN=which.max)
     res_models <- cbind(res_models, res)
+    if(is.null(best_loglike) || best_loglike < temp$L){
+      best_loglike <- temp$L
+      best_partition <- res
+    }
   }
   cat("=======\n# Spherical k-means\n=======\n")
   temp <- skmeans(data, k = no_cluster)
@@ -67,9 +73,10 @@ run <- function(data, label, verbose=FALSE){
   print(dim(res_models))
   
   ### 2 ###
-  cat("=======\n# Default movMF\n=======\n")
-  temp <- movMF(data, no_cluster, verbose=verbose, nruns=10)   
-  res_vMF <- apply(temp$P, MARGIN=1, FUN=which.max)
+  cat("=======\n# Best movMF\n=======\n")
+  #temp <- movMF(data, no_cluster, verbose=verbose, nruns=10)   
+  #res_vMF <- apply(temp$P, MARGIN=1, FUN=which.max)
+  res_vMF <- best_partition
   
   #cat("=======\n# Best Gaussian\n=======\n")
   #res_mclust <- Mclust(data, G=no_cluster)$classification
