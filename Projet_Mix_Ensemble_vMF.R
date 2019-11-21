@@ -45,10 +45,13 @@ wap_y <- as.factor(as.integer(unlist(read.csv("Dataset_CLUTO/wap.mat.rclass", he
 # II
 #################################################
 
-run <- function(data, label, verbose=FALSE){
+run <- function(data, label, verbose=FALSE, no_cluster=NULL){
   
   #data <- type.convert(data)
-  no_cluster <- length(unique(label))
+  no_real_cluster <- length(unique(label))
+  if(is.null(no_cluster)){
+    no_cluster <- no_real_cluster
+  }
   
   ### 1 ###
   cat("=======\n# movMF\n=======\n")
@@ -58,7 +61,7 @@ run <- function(data, label, verbose=FALSE){
   best_partition <- NULL
   for(method in methods){
     print(method)
-    temp <- movMF(data, no_cluster, verbose=verbose, nruns=10, control = list(kappa = method))   
+    temp <- movMF(data, no_cluster, verbose=verbose, control=list(kappa=method, nruns=2))
     res <- apply(temp$P, MARGIN=1, FUN=which.max)
     res_models <- cbind(res_models, res)
     if(is.null(best_loglike) || best_loglike < temp$L){
@@ -67,13 +70,13 @@ run <- function(data, label, verbose=FALSE){
     }
   }
   cat("=======\n# Spherical k-means\n=======\n")
-  temp <- skmeans(data, k = no_cluster)
+  temp <- skmeans(data, k = no_cluster, control=list(nruns=1))
   res_models <- cbind(res_models, temp$cluster)
   
   print(dim(res_models))
   
   ### 2 ###
-  cat("=======\n# Best movMF\n=======\n")
+  #cat("=======\n# Best movMF\n=======\n")
   #temp <- movMF(data, no_cluster, verbose=verbose, nruns=10)   
   #res_vMF <- apply(temp$P, MARGIN=1, FUN=which.max)
   res_vMF <- best_partition
@@ -83,28 +86,49 @@ run <- function(data, label, verbose=FALSE){
   
   ### 3 ###
   cat("=======\n# Consensus\n=======\n")
-  res_mixmod <- mixmodCluster(as.data.frame(type.convert(res_models)), nbCluster = no_cluster, models=mixmodMultinomialModel(), dataType="qualitative")
+  res_mixmod <- mixmodCluster(as.data.frame(type.convert(res_models)), nbCluster = no_real_cluster, models=mixmodMultinomialModel(), dataType="qualitative")
   
   #cat("##############\n# Best Gaussian\n##############\n")
   #cat("NMI: ", NMI(as.factor(res_mclust), as.factor(label)), "\n")
   #cat("ARI: ", ARI(as.factor(res_mclust), as.factor(label)), "\n")
   
-  cat("##############\n# Default movMF\n##############\n")
-  cat("NMI: ", NMI(as.factor(res_vMF), as.factor(label)), "\n")
-  cat("ARI: ", ARI(as.factor(res_vMF), as.factor(label)), "\n")
+  #cat("##############\n# Best movMF\n##############\n")
+  #cat("NMI: ", NMI(as.factor(res_vMF), as.factor(label)), "\n")
+  #cat("ARI: ", ARI(as.factor(res_vMF), as.factor(label)), "\n")
   
-  cat("##############\n# Consensus\n##############\n")
-  cat("NMI: ", NMI(as.factor(res_mixmod@bestResult@partition), as.factor(label)), "\n")
-  cat("ARI: ", ARI(as.factor(res_mixmod@bestResult@partition), as.factor(label)), "\n")
+  #cat("##############\n# Consensus\n##############\n")
+  #cat("NMI: ", NMI(as.factor(res_mixmod@bestResult@partition), as.factor(label)), "\n")
+  #cat("ARI: ", ARI(as.factor(res_mixmod@bestResult@partition), as.factor(label)), "\n")
   
+  return(res_mixmod@bestResult@partition)
 }
 
-run(tr23, tr23_y)
+run_many <- function(data, label, verbose=FALSE, no_cluster=NULL){
+  best_nmi <- 0
+  best_ari <- 0
+  for(i in 1:10){
+    res <- run(data, label, verbose=verbose, no_cluster=no_cluster)
+    nmi <- NMI(as.factor(res), as.factor(label))
+    ari <- ARI(as.factor(res), as.factor(label))
+    if(mean(c(best_nmi, best_ari)) < mean(c(nmi, ari))){
+      best_ari <- ari
+      best_nmi <- nmi
+      
+      print(best_nmi)
+      print(best_ari)
+    }
+  }
+  
+  print(best_nmi)
+  print(best_ari)
+}
 
-run(fbis, fbis_y)
+no_cluster <- NULL
 
-run(re0, re0_y)
+run(fbis, fbis_y, no_cluster=no_cluster)
 
-run(wap, wap_y)
-    
+run(re0, re0_y, no_cluster=no_cluster)
+
+run(wap, wap_y, no_cluster=no_cluster)
+            
 
